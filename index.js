@@ -5,7 +5,7 @@ import 'dotenv/config';
 
 async function run() {
   try {
-    const token = process.env.GITHUB_TOKEN;
+    const token = process.env.PAT;
     const dryRun = process.env.DRY_RUN === 'true';
     const skipNonOwnedRepos = process.env.SKIP_NON_OWNED_REPOS !== 'false';
 
