@@ -26,6 +26,9 @@ on:
 jobs:
   bump-prs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
