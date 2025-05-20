@@ -25,13 +25,14 @@ Create a GitHub Personal Access Token with the following permissions:
 
 Add your PAT as a repository secret named `COPILOT_PAT`.
 
-### 3. Configure OpenAI (Optional)
+### 3. Configure AI Analysis
 
-To enable AI-based analysis of issue completion:
-1. Get an OpenAI API key from [OpenAI's platform](https://platform.openai.com/)
-2. Add your API key as a repository secret named `OPENAI_API_KEY`
+The action uses GitHub's AI models to analyze PR comments and determine if issues have been fixed:
+- This feature is automatically enabled when you provide the PAT from step 1
+- The same GitHub token is used for both GitHub API access and GitHub AI models
+- No additional configuration is required
 
-Without this key, the action will still work but won't analyze comments to check if issues are fixed.
+The AI analysis helps prevent unnecessary "still working?" comments on PRs where Copilot has already completed the work.
 
 ### 4. Configure the Action
 
@@ -86,7 +87,7 @@ You can modify `index.js` to adjust:
 - The stall detection period (currently: 1 hour or 24 hours)
 - The comment used to trigger Copilot
 - The PR identification criteria
-- The AI model used for comment analysis
+- The AI model used for comment analysis (using GitHub's hosted models)
 - The prompt used for issue resolution detection
 
 ## License

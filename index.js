@@ -9,20 +9,21 @@ async function run() {
     const token = process.env.PAT;
     const dryRun = process.env.DRY_RUN === 'true';
     const skipNonOwnedRepos = process.env.SKIP_NON_OWNED_REPOS !== 'false';
-    const openaiApiKey = process.env.OPENAI_API_KEY;
 
     if (!token) {
       throw new Error('GITHUB_TOKEN not provided. Please set a Personal Access Token with appropriate permissions.');
     }
 
-    // Initialize OpenAI client if API key is provided
+    // Initialize OpenAI client using GitHub Models API
     let openai = null;
-    if (openaiApiKey) {
-      openai = new OpenAI({
-        apiKey: openaiApiKey
+    try {
+      openai = new OpenAI({ 
+        baseURL: 'https://models.github.ai/inference', 
+        apiKey: token 
       });
-    } else {
-      console.log('⚠️ OPENAI_API_KEY not provided. Will fallback to non-AI behavior.');
+      console.log('✅ GitHub Models client initialized');
+    } catch (error) {
+      console.log(`⚠️ GitHub Models client initialization failed: ${error.message}. Will fallback to non-AI behavior.`);
     }
 
     console.log(`🚀 Starting Copilot PR bumper${dryRun ? ' (DRY RUN MODE)' : ''}${skipNonOwnedRepos ? ' (SKIPPING NON-OWNED REPOS)' : ''}`);
@@ -71,12 +72,11 @@ Comment: "${latestComment.body}"
 Based on this comment, is the issue fixed, resolved, or completed? Answer with "YES" if it appears to be resolved/fixed/completed, or "NO" if it's still in progress or needs more work.`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+          model: "openai/gpt-4.1",
           messages: [
             { role: "system", content: "You are a helpful assistant analyzing GitHub PR comments." },
             { role: "user", content: prompt }
           ],
-          max_tokens: 50,
           temperature: 0.3,
         });
 
