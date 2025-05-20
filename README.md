@@ -27,7 +27,7 @@ Add your PAT as a repository secret named `COPILOT_PAT`.
 
 ### 3. Configure the Action
 
-The action is already configured to run every 3 hours, but you can adjust the frequency in the `.github/workflows/copilot-bumper.yml` file.
+The action is already configured to run every hour, but you can adjust the frequency in the `.github/workflows/copilot-bumper.yml` file.
 
 ## Usage
 
