@@ -35,6 +35,10 @@ async function run() {
 
     console.log(`Found ${prNotifications.length} PR-related notifications.`);
 
+    // Shuffle the array of PR notifications for randomized processing
+    const shuffledNotifications = [...prNotifications].sort(() => Math.random() - 0.5);
+    console.log(`Randomized processing order of notifications.`);
+
     // Limit the number of PRs we comment on per run
     const MAX_COMMENTS_PER_RUN = 5;
     let commentsCount = 0;
@@ -105,8 +109,8 @@ async function run() {
       }
     }
 
-    // Process notifications sequentially
-    for (const notification of prNotifications) {
+    // Process shuffled notifications sequentially
+    for (const notification of shuffledNotifications) {
       await processNotification(notification);
       
       // Stop processing if we've reached the maximum comments limit

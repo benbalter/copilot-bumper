@@ -63,12 +63,13 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
 
 1. The action fetches all your GitHub notifications
 2. It filters for pull request notifications across all your repositories
-3. For each notification, it checks if the PR:
+3. It randomly shuffles the order of notifications to ensure different PRs get attention over time
+4. For each notification, it checks if the PR:
    - Was created by Copilot (based on user or content)
    - Is marked as a draft or contains "WIP" in the title
    - Hasn't been updated in the last hour OR the last 24 hours
-4. If all conditions are met, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
-5. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
+5. If all conditions are met, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
+6. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
 
 ## Customization
 
