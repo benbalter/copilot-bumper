@@ -28,9 +28,6 @@ coverage
 dist/
 build/
 
-# Package locks
-package-lock.json
-
 # Editor directories and files
 .idea/
 .vscode/
