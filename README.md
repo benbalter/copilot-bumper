@@ -25,7 +25,16 @@ Create a GitHub Personal Access Token with the following permissions:
 
 Add your PAT as a repository secret named `COPILOT_PAT`.
 
-### 3. Configure the Action
+### 3. Configure AI Analysis
+
+The action uses GitHub's AI models to analyze PR comments and determine if issues have been fixed:
+- This feature is automatically enabled when you provide the PAT from step 1
+- The same GitHub token is used for both GitHub API access and GitHub AI models
+- No additional configuration is required
+
+The AI analysis helps prevent unnecessary "still working?" comments on PRs where Copilot has already completed the work.
+
+### 4. Configure the Action
 
 The action is already configured to run every hour, but you can adjust the frequency in the `.github/workflows/copilot-bumper.yml` file.
 
@@ -68,8 +77,9 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
    - Was created by Copilot (based on user or content)
    - Is marked as a draft or contains "WIP" in the title
    - Hasn't been updated in the last hour OR the last 24 hours
-5. If all conditions are met, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
-6. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
+5. If all conditions are met, it uses AI to analyze the latest comment to determine if the issue has been fixed
+6. If the issue doesn't appear to be fixed, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
+7. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
 
 ## Customization
 
@@ -77,6 +87,8 @@ You can modify `index.js` to adjust:
 - The stall detection period (currently: 1 hour or 24 hours)
 - The comment used to trigger Copilot
 - The PR identification criteria
+- The AI model used for comment analysis (using GitHub's hosted models)
+- The prompt used for issue resolution detection
 
 ## License
 
