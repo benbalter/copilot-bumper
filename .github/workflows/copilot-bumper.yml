@@ -42,6 +42,6 @@ jobs:
       - name: Bump stalled Copilot PRs
         run: node index.js
         env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          PAT: ${{ secrets.PAT }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           SKIP_NON_OWNED_REPOS: ${{ github.event.inputs.skip_non_owned_repos || 'true' }}
