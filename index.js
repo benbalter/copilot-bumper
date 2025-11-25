@@ -134,7 +134,7 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
           // Look for errored or failed check runs from Copilot
           hasErroredStatus = checkRuns.check_runs.some(run => 
             (run.conclusion === 'failure' || run.conclusion === 'cancelled') &&
-            (run.app?.slug === 'github-actions' || run.name.toLowerCase().includes('copilot'))
+            run.name.toLowerCase().includes('copilot')
           );
           
           if (hasErroredStatus) {
