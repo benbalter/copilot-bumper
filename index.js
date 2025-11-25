@@ -117,9 +117,9 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
         const isWip = pr.title.toLowerCase().includes('wip') || pr.draft === true;
         // Update stalled check to include PRs with no activity in the past hour
         const oneHourInMs = 60 * 60 * 1000;
-        const oneDayInMs = 24 * 60 * 60 * 1000;
         const timeSinceUpdate = new Date() - new Date(pr.updated_at);
         const noActivityPastHour = timeSinceUpdate > oneHourInMs;
+        const isStalled = isWip && noActivityPastHour;
         const noActivityPastDay = timeSinceUpdate > oneDayInMs;
         
         // Check if Copilot has encountered an error (rate limit, etc.)
@@ -192,11 +192,10 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
                 body: '@copilot still working?'
               });
               console.log(`🔄 Asked Copilot to try again on PR ${owner}/${repo}#${prNumber}`);
-              commentsCount++;
             } else {
               console.log(`🔄 [DRY RUN] Would have asked Copilot to try again on PR ${owner}/${repo}#${prNumber}`);
-              commentsCount++;
             }
+            commentsCount++;
           } else {
             console.log(`⏭️ Skipping comment on PR ${owner}/${repo}#${prNumber} - reached max comments limit (${MAX_COMMENTS_PER_RUN})`);
           }
