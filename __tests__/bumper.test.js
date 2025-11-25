@@ -7,7 +7,8 @@ import {
   findRelevantComment,
   filterPrNotifications,
   shuffleArray,
-  isIssueFixed
+  isIssueFixed,
+  isCopilotError
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -270,5 +271,96 @@ describe('isIssueFixed', () => {
     };
     const result = await isIssueFixed({ body: 'Some comment' }, mockOpenAI);
     expect(result).toBe(false);
+  });
+});
+
+describe('isCopilotError', () => {
+  it('should return false if no comment provided', () => {
+    expect(isCopilotError(null)).toBe(false);
+  });
+
+  it('should return false if comment has no body', () => {
+    const comment = { user: { login: 'copilot[bot]' } };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return false for non-copilot user comments', () => {
+    const comment = {
+      user: { login: 'someuser' },
+      body: 'I encountered an error while processing'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return true for copilot error - encountered an error', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I encountered an error while trying to implement this feature.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - ran into an error', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I ran into an error processing the request.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - was unable to', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I was unable to complete the task due to a configuration issue.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - apologize', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I apologize, but I could not complete the task.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - unfortunately', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'Unfortunately, I was not able to finish the implementation.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - something went wrong', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'Something went wrong during the process.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return false for copilot success message', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I have successfully completed the implementation.'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return false for copilot work in progress message', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I am currently working on this task.'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should be case insensitive', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I ENCOUNTERED AN ERROR while processing.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
   });
 });
