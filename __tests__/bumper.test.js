@@ -8,7 +8,8 @@ import {
   filterPrNotifications,
   shuffleArray,
   isIssueFixed,
-  isCopilotError
+  isCopilotError,
+  hasMergeConflict
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -362,5 +363,47 @@ describe('isCopilotError', () => {
       body: 'I ENCOUNTERED AN ERROR while processing.'
     };
     expect(isCopilotError(comment)).toBe(true);
+  });
+});
+
+describe('hasMergeConflict', () => {
+  it('should return true when mergeable is false and mergeable_state is dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'dirty'
+    };
+    expect(hasMergeConflict(pr)).toBe(true);
+  });
+
+  it('should return false when mergeable is true', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'clean'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is null (GitHub still computing)', () => {
+    const pr = {
+      mergeable: null,
+      mergeable_state: 'unknown'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is false but state is not dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'blocked'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable state is unstable', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'unstable'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
   });
 });

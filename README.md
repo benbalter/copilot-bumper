@@ -79,7 +79,9 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
    - Hasn't been updated in the last hour OR the last 24 hours
    - OR has errored/failed check runs (e.g., rate limits or other Copilot errors)
 5. If all conditions are met, it uses AI to analyze the latest comment to determine if the issue has been fixed
-6. If the issue doesn't appear to be fixed, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
+6. If the issue doesn't appear to be fixed:
+   - If the PR has merge conflicts with the base branch, it adds a comment asking Copilot to merge in the base branch and resolve the conflicts
+   - Otherwise, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
 7. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
 
 ## Customization
