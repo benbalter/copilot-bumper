@@ -168,7 +168,9 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
           }
           
           // Add comment to ask Copilot to try again (unless in DRY_RUN mode or issue is fixed)
-          if (!isFixed) {
+          // Note: commentsCount is checked again for defensive programming, though in practice
+          // it cannot change between the early check and here due to single-threaded execution
+          if (!isFixed && commentsCount < MAX_COMMENTS_PER_RUN) {
             if (!dryRun) {
               await octokit.rest.issues.createComment({
                 owner,
@@ -182,7 +184,7 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
               console.log(`🔄 [DRY RUN] Would have asked Copilot to try again on PR ${owner}/${repo}#${prNumber}`);
               commentsCount++;
             }
-          } else {
+          } else if (isFixed) {
             console.log(`⏭️ Skipping comment on PR ${owner}/${repo}#${prNumber} - AI determined issue is fixed`);
           }
           // Note: We no longer mark notifications as read
