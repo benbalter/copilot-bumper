@@ -1,8 +1,10 @@
 import * as core from '@actions/core';
 import github from '@actions/github';
-import fetch from 'node-fetch';
 import 'dotenv/config';
 import OpenAI from 'openai';
+
+// Time constants (moved outside function to avoid recalculation)
+const ONE_HOUR_IN_MS = 60 * 60 * 1000;
 
 async function run() {
   try {
@@ -41,12 +43,19 @@ async function run() {
 
     console.log(`Found ${notifications.data.length} notifications.`);
 
-    // Filter for PR-related notifications, now from any repo
-    const prNotifications = notifications.data.filter(notification => 
-      notification.subject.type === 'PullRequest'
-    );
+    // Filter for PR-related notifications, optionally filtering by ownership early to avoid unnecessary work
+    const prNotifications = notifications.data.filter(notification => {
+      if (notification.subject.type !== 'PullRequest') {
+        return false;
+      }
+      // Early filtering: skip non-owned repos before shuffling to reduce unnecessary processing
+      if (skipNonOwnedRepos && notification.repository.owner.login !== authenticatedUser.login) {
+        return false;
+      }
+      return true;
+    });
 
-    console.log(`Found ${prNotifications.length} PR-related notifications.`);
+    console.log(`Found ${prNotifications.length} PR-related notifications${skipNonOwnedRepos ? ' (filtered to owned repos)' : ''}.`);
 
     // Shuffle the array of PR notifications for randomized processing
     const shuffledNotifications = [...prNotifications].sort(() => Math.random() - 0.5);
@@ -95,11 +104,8 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
       const owner = notification.repository.owner.login;
       const repo = notification.repository.name;
       
-      // Skip repositories not owned by the authenticated user if skipNonOwnedRepos is true
-      if (skipNonOwnedRepos && owner !== authenticatedUser.login) {
-        console.log(`Skipping PR #${prNumber} in ${owner}/${repo} - not owned by you`);
-        return;
-      }
+      // Note: Ownership filtering is now done earlier during notification filtering
+      // for better performance (avoiding unnecessary shuffling and processing)
       
       console.log(`Processing PR #${prNumber} in ${owner}/${repo}...`);
       try {
@@ -115,17 +121,20 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
                             pr.title.toLowerCase().includes('copilot') || 
                             pr.body?.toLowerCase().includes('copilot');
         const isWip = pr.title.toLowerCase().includes('wip') || pr.draft === true;
-        // Update stalled check to include PRs with no activity in the past hour
-        const oneHourInMs = 60 * 60 * 1000;
-        const oneDayInMs = 24 * 60 * 60 * 1000;
+        // Check for no activity in the past hour (simplified from redundant hour || day check)
         const timeSinceUpdate = new Date() - new Date(pr.updated_at);
-        const noActivityPastHour = timeSinceUpdate > oneHourInMs;
-        const noActivityPastDay = timeSinceUpdate > oneDayInMs;
-        const isStalled = isWip && (noActivityPastHour || noActivityPastDay);
+        const noActivityPastHour = timeSinceUpdate > ONE_HOUR_IN_MS;
+        const isStalled = isWip && noActivityPastHour;
         
         if (isCopilotPr && isStalled) {
           console.log(`Found stalled Copilot PR: ${owner}/${repo}#${prNumber} - ${pr.title}`);
           console.log(`Last updated: ${pr.updated_at}, time since update: ${Math.round(timeSinceUpdate / 1000 / 60)} minutes`);
+          
+          // Skip AI analysis if we've already reached the comment limit to avoid wasteful API calls
+          if (commentsCount >= MAX_COMMENTS_PER_RUN) {
+            console.log(`⏭️ Skipping AI analysis for PR ${owner}/${repo}#${prNumber} - already at max comments limit (${MAX_COMMENTS_PER_RUN})`);
+            return;
+          }
           
           // Get the latest comment to analyze if the issue is fixed
           let isFixed = false;
@@ -159,8 +168,7 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
           }
           
           // Add comment to ask Copilot to try again (unless in DRY_RUN mode or issue is fixed)
-          // But only if we haven't reached the maximum number of comments per run
-          if (!isFixed && commentsCount < MAX_COMMENTS_PER_RUN) {
+          if (!isFixed) {
             if (!dryRun) {
               await octokit.rest.issues.createComment({
                 owner,
@@ -175,7 +183,7 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
               commentsCount++;
             }
           } else {
-            console.log(`⏭️ Skipping comment on PR ${owner}/${repo}#${prNumber} - reached max comments limit (${MAX_COMMENTS_PER_RUN})`);
+            console.log(`⏭️ Skipping comment on PR ${owner}/${repo}#${prNumber} - AI determined issue is fixed`);
           }
           // Note: We no longer mark notifications as read
         } else {
