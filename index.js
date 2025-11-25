@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 
 // Time constants (moved outside function to avoid recalculation)
 const ONE_HOUR_IN_MS = 60 * 60 * 1000;
+const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 async function run() {
   try {
@@ -121,10 +122,34 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
                             pr.title.toLowerCase().includes('copilot') || 
                             pr.body?.toLowerCase().includes('copilot');
         const isWip = pr.title.toLowerCase().includes('wip') || pr.draft === true;
-        // Check for no activity in the past hour (simplified from redundant hour || day check)
+        // Check for no activity in the past hour or day
         const timeSinceUpdate = new Date() - new Date(pr.updated_at);
         const noActivityPastHour = timeSinceUpdate > ONE_HOUR_IN_MS;
-        const isStalled = isWip && noActivityPastHour;
+        const noActivityPastDay = timeSinceUpdate > ONE_DAY_IN_MS;
+        
+        // Check if Copilot has encountered an error (rate limit, etc.)
+        let hasErroredStatus = false;
+        try {
+          const { data: checkRuns } = await octokit.rest.checks.listForRef({
+            owner,
+            repo,
+            ref: pr.head.sha
+          });
+          
+          // Look for errored or failed check runs from Copilot
+          hasErroredStatus = checkRuns.check_runs.some(run => 
+            (run.conclusion === 'failure' || run.conclusion === 'cancelled') &&
+            run.name.toLowerCase().includes('copilot')
+          );
+          
+          if (hasErroredStatus) {
+            console.log(`PR ${owner}/${repo}#${prNumber} has errored Copilot check runs`);
+          }
+        } catch (checkError) {
+          console.error(`Error fetching check runs for PR ${owner}/${repo}#${prNumber}:`, checkError.message);
+        }
+        
+        const isStalled = (isWip && (noActivityPastHour || noActivityPastDay)) || hasErroredStatus;
         
         if (isCopilotPr && isStalled) {
           console.log(`Found stalled Copilot PR: ${owner}/${repo}#${prNumber} - ${pr.title}`);
@@ -179,18 +204,17 @@ Based on this comment, is the issue fixed, resolved, or completed? Answer with "
                 body: '@copilot still working?'
               });
               console.log(`🔄 Asked Copilot to try again on PR ${owner}/${repo}#${prNumber}`);
-              commentsCount++;
             } else {
               console.log(`🔄 [DRY RUN] Would have asked Copilot to try again on PR ${owner}/${repo}#${prNumber}`);
-              commentsCount++;
             }
+            commentsCount++;
           } else if (isFixed) {
             console.log(`⏭️ Skipping comment on PR ${owner}/${repo}#${prNumber} - AI determined issue is fixed`);
           }
           // Note: We no longer mark notifications as read
         } else {
           console.log(`PR ${owner}/${repo}#${prNumber} is not a stalled Copilot PR or doesn't need bumping.`);
-          console.log(`isCopilotPr: ${isCopilotPr}, isWip: ${isWip}, isStalled: ${isStalled}`);
+          console.log(`isCopilotPr: ${isCopilotPr}, isWip: ${isWip}, isStalled: ${isStalled}, hasErroredStatus: ${hasErroredStatus}`);
         }
       } catch (prError) {
         console.error(`Error processing PR ${owner}/${repo}#${prNumber}:`, prError.message);
