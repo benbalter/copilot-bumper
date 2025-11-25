@@ -1,7 +1,5 @@
-import * as core from '@actions/core';
-import github from '@actions/github';
-import fetch from 'node-fetch';
 import 'dotenv/config';
+import { run } from './lib/bumper.js';
 import OpenAI from 'openai';
 
 async function run() {
