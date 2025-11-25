@@ -445,14 +445,23 @@ describe('findLatestReviewComment', () => {
     expect(findLatestReviewComment(reviewComments)).toBeUndefined();
   });
 
-  it('should handle comments with missing user field', () => {
+  it('should skip comments with missing user field', () => {
     const reviewComments = [
       { id: 1, body: 'No user field' },
       { id: 2, body: 'Please fix this', user: { login: 'reviewer' } }
     ];
     const result = findLatestReviewComment(reviewComments);
-    // The first comment has no user, so it's not from copilot[bot], so it should be returned
-    expect(result.id).toBe(1);
+    // The first comment has no user, so it should be skipped
+    expect(result.id).toBe(2);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should return undefined if all comments have missing user fields', () => {
+    const reviewComments = [
+      { id: 1, body: 'No user field' },
+      { id: 2, body: 'Also no user field' }
+    ];
+    expect(findLatestReviewComment(reviewComments)).toBeUndefined();
   });
 });
 
