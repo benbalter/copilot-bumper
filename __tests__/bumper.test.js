@@ -10,7 +10,8 @@ import {
   isIssueFixed,
   isCopilotError,
   hasReviewComments,
-  findLatestReviewComment
+  findLatestReviewComment,
+  hasMergeConflict
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -483,5 +484,56 @@ describe('findRelevantComment with feedback comments', () => {
     ];
     const result = findRelevantComment(comments);
     expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out merge conflict comments', () => {
+    const comments = [
+      { body: '@copilot There is a merge conflict with the base branch. Please merge in the base branch and resolve the conflicts.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+});
+
+describe('hasMergeConflict', () => {
+  it('should return true when mergeable is false and mergeable_state is dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'dirty'
+    };
+    expect(hasMergeConflict(pr)).toBe(true);
+  });
+
+  it('should return false when mergeable is true', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'clean'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is null (GitHub still computing)', () => {
+    const pr = {
+      mergeable: null,
+      mergeable_state: 'unknown'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is false but state is not dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'blocked'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable state is unstable', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'unstable'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
   });
 });
