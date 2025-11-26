@@ -84,11 +84,13 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
    - If there are line-level review comments (feedback), it adds a comment with `@copilot please implement the feedback left on this PR.` to trigger Copilot to address the feedback
    - Otherwise, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
 7. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
+8. **Second pass with relaxed criteria**: If fewer than 2 PRs were bumped in the first pass (with 1-hour stall threshold), the action performs a second pass with a relaxed 30-minute stall threshold to find additional PRs that might need bumping
 
 ## Customization
 
-You can modify `index.js` to adjust:
-- The stall detection period (currently: 1 hour or 24 hours)
+You can modify `lib/bumper.js` to adjust:
+- The stall detection period (currently: 1 hour default, 30 minutes for second pass)
+- The minimum bumps threshold before triggering a second pass (currently: 2)
 - The comment used to trigger Copilot
 - The PR identification criteria
 - The AI model used for comment analysis (using GitHub's hosted models)
