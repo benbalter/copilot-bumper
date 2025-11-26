@@ -76,23 +76,27 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
 4. For each notification, it checks if the PR:
    - Was created by Copilot (based on user or content)
    - Is marked as a draft or contains "WIP" in the title
-   - Hasn't been updated in the last hour OR the last 24 hours
-   - OR has errored/failed check runs (e.g., rate limits or other Copilot errors)
-5. If all conditions are met, it uses AI to analyze the latest comment to determine if the issue has been fixed
-6. If the issue doesn't appear to be fixed:
-   - If the PR has merge conflicts with the base branch, it adds a comment asking Copilot to merge in the base branch and resolve the conflicts
-   - If there are line-level review comments (feedback), it adds a comment with `@copilot please implement the feedback left on this PR.` to trigger Copilot to address the feedback
-   - Otherwise, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
+   - Hasn't been updated in the last hour
+   - OR has a Copilot error in comments (e.g., rate limits or other errors)
+   - OR has a failed Copilot session (based on PR timeline events)
+   - OR has failing CI check runs (e.g., test failures or build issues)
+5. If the conditions are met, it uses AI to analyze the latest comment to determine if the issue has been fixed
+6. If the issue doesn't appear to be fixed, it adds a comment based on priority:
+   - **Merge conflicts**: Asks Copilot to merge in the base branch and resolve the conflicts
+   - **Failing CI checks**: Asks Copilot to fix the failing tests or build issues
+   - **Line-level review comments**: Asks Copilot to implement the feedback left on the PR
+   - **Otherwise**: Asks Copilot "still working?" to trigger continuation
 7. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
 
 ## Customization
 
-You can modify `index.js` to adjust:
-- The stall detection period (currently: 1 hour or 24 hours)
-- The comment used to trigger Copilot
+You can modify `lib/bumper.js` to adjust:
+- The stall detection period (currently: 1 hour)
+- The comment used to trigger Copilot for different situations
 - The PR identification criteria
 - The AI model used for comment analysis (using GitHub's hosted models)
 - The prompt used for issue resolution detection
+- The detection patterns for Copilot errors
 
 ## License
 
