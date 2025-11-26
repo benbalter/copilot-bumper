@@ -9,6 +9,8 @@ import {
   shuffleArray,
   isIssueFixed,
   isCopilotError,
+  hasReviewComments,
+  findLatestReviewComment,
   hasMergeConflict
 } from '../lib/bumper.js';
 
@@ -363,6 +365,134 @@ describe('isCopilotError', () => {
       body: 'I ENCOUNTERED AN ERROR while processing.'
     };
     expect(isCopilotError(comment)).toBe(true);
+  });
+});
+
+describe('hasReviewComments', () => {
+  it('should return false for null input', () => {
+    expect(hasReviewComments(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasReviewComments(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasReviewComments('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasReviewComments([])).toBe(false);
+  });
+
+  it('should return true for array with review comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    expect(hasReviewComments(reviewComments)).toBe(true);
+  });
+
+  it('should return true for array with multiple review comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } },
+      { id: 2, body: 'Also fix this', user: { login: 'anotherreviewer' } }
+    ];
+    expect(hasReviewComments(reviewComments)).toBe(true);
+  });
+});
+
+describe('findLatestReviewComment', () => {
+  it('should return undefined for null input', () => {
+    expect(findLatestReviewComment(null)).toBeUndefined();
+  });
+
+  it('should return undefined for undefined input', () => {
+    expect(findLatestReviewComment(undefined)).toBeUndefined();
+  });
+
+  it('should return undefined for non-array input', () => {
+    expect(findLatestReviewComment('not an array')).toBeUndefined();
+  });
+
+  it('should return undefined for empty array', () => {
+    expect(findLatestReviewComment([])).toBeUndefined();
+  });
+
+  it('should return first non-copilot comment', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } },
+      { id: 2, body: 'Also fix this', user: { login: 'anotherreviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    expect(result.id).toBe(1);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should skip copilot[bot] comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'AI comment', user: { login: 'copilot[bot]' } },
+      { id: 2, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    expect(result.id).toBe(2);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should return undefined if all comments are from copilot[bot]', () => {
+    const reviewComments = [
+      { id: 1, body: 'AI comment 1', user: { login: 'copilot[bot]' } },
+      { id: 2, body: 'AI comment 2', user: { login: 'copilot[bot]' } }
+    ];
+    expect(findLatestReviewComment(reviewComments)).toBeUndefined();
+  });
+
+  it('should skip comments with missing user field', () => {
+    const reviewComments = [
+      { id: 1, body: 'No user field' },
+      { id: 2, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    // The first comment has no user, so it should be skipped
+    expect(result.id).toBe(2);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should return undefined if all comments have missing user fields', () => {
+    const reviewComments = [
+      { id: 1, body: 'No user field' },
+      { id: 2, body: 'Also no user field' }
+    ];
+    expect(findLatestReviewComment(reviewComments)).toBeUndefined();
+  });
+});
+
+describe('findRelevantComment with feedback comments', () => {
+  it('should filter out feedback implementation comments', () => {
+    const comments = [
+      { body: '@copilot please implement the feedback left on this PR.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out both bump and feedback comments', () => {
+    const comments = [
+      { body: '@copilot still working?' },
+      { body: '@copilot please implement the feedback left on this PR.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out merge conflict comments', () => {
+    const comments = [
+      { body: '@copilot There is a merge conflict with the base branch. Please merge in the base branch and resolve the conflicts.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
   });
 });
 
