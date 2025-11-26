@@ -11,7 +11,8 @@ import {
   isCopilotError,
   hasReviewComments,
   findLatestReviewComment,
-  hasMergeConflict
+  hasMergeConflict,
+  hasCopilotSessionStopped
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -535,5 +536,57 @@ describe('hasMergeConflict', () => {
       mergeable_state: 'unstable'
     };
     expect(hasMergeConflict(pr)).toBe(false);
+  });
+});
+
+describe('hasCopilotSessionStopped', () => {
+  it('should return false for null input', () => {
+    expect(hasCopilotSessionStopped(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasCopilotSessionStopped(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasCopilotSessionStopped('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasCopilotSessionStopped([])).toBe(false);
+  });
+
+  it('should return true when timeline contains copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'commented' },
+      { event: 'copilot_session_stopped' },
+      { event: 'committed' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
+  });
+
+  it('should return false when timeline has no copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'commented' },
+      { event: 'committed' },
+      { event: 'labeled' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(false);
+  });
+
+  it('should return true for timeline with only copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
+  });
+
+  it('should return true when multiple copilot_session_stopped events exist', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped' },
+      { event: 'commented' },
+      { event: 'copilot_session_stopped' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
   });
 });
