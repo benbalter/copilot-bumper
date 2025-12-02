@@ -7,7 +7,12 @@ import {
   findRelevantComment,
   filterPrNotifications,
   shuffleArray,
-  isIssueFixed
+  isIssueFixed,
+  isCopilotError,
+  hasReviewComments,
+  findLatestReviewComment,
+  hasMergeConflict,
+  hasCopilotSessionStopped
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -114,6 +119,39 @@ describe('isStalled', () => {
       updated_at: fiveMinutesAgo.toISOString()
     };
     expect(isStalled(pr)).toBe(false);
+  });
+
+  it('should use custom threshold when provided', () => {
+    const fortyMinutesAgo = new Date(Date.now() - 40 * 60 * 1000);
+    const pr = {
+      updated_at: fortyMinutesAgo.toISOString()
+    };
+    // With default 1 hour threshold, this should not be stalled
+    expect(isStalled(pr)).toBe(false);
+    // With 30 minute threshold, this should be stalled
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(true);
+  });
+
+  it('should return false when time is exactly at threshold', () => {
+    // Test boundary: exactly at 30 minutes
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const pr = {
+      updated_at: thirtyMinutesAgo.toISOString()
+    };
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    // Should be false because it's NOT greater than threshold
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(false);
+  });
+
+  it('should return true when time is just over threshold', () => {
+    // Just over 30 minutes (30 minutes + 1 second)
+    const justOverThirtyMinutes = new Date(Date.now() - (30 * 60 * 1000 + 1000));
+    const pr = {
+      updated_at: justOverThirtyMinutes.toISOString()
+    };
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(true);
   });
 });
 
@@ -296,5 +334,318 @@ describe('isIssueFixed', () => {
     };
     const result = await isIssueFixed({ body: 'Some comment' }, mockOpenAI);
     expect(result).toBe(false);
+  });
+});
+
+describe('isCopilotError', () => {
+  it('should return false if no comment provided', () => {
+    expect(isCopilotError(null)).toBe(false);
+  });
+
+  it('should return false if comment has no body', () => {
+    const comment = { user: { login: 'copilot[bot]' } };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return false for non-copilot user comments', () => {
+    const comment = {
+      user: { login: 'someuser' },
+      body: 'I encountered an error while processing'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return true for copilot error - encountered an error', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I encountered an error while trying to implement this feature.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - ran into an error', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I ran into an error processing the request.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - was unable to', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I was unable to complete the task due to a configuration issue.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - apologize', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I apologize, but I could not complete the task.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - unfortunately', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'Unfortunately, I was not able to finish the implementation.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return true for copilot error - something went wrong', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'Something went wrong during the process.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+
+  it('should return false for copilot success message', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I have successfully completed the implementation.'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should return false for copilot work in progress message', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I am currently working on this task.'
+    };
+    expect(isCopilotError(comment)).toBe(false);
+  });
+
+  it('should be case insensitive', () => {
+    const comment = {
+      user: { login: 'copilot[bot]' },
+      body: 'I ENCOUNTERED AN ERROR while processing.'
+    };
+    expect(isCopilotError(comment)).toBe(true);
+  });
+});
+
+describe('hasReviewComments', () => {
+  it('should return false for null input', () => {
+    expect(hasReviewComments(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasReviewComments(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasReviewComments('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasReviewComments([])).toBe(false);
+  });
+
+  it('should return true for array with review comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    expect(hasReviewComments(reviewComments)).toBe(true);
+  });
+
+  it('should return true for array with multiple review comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } },
+      { id: 2, body: 'Also fix this', user: { login: 'anotherreviewer' } }
+    ];
+    expect(hasReviewComments(reviewComments)).toBe(true);
+  });
+});
+
+describe('findLatestReviewComment', () => {
+  it('should return undefined for null input', () => {
+    expect(findLatestReviewComment(null)).toBeUndefined();
+  });
+
+  it('should return undefined for undefined input', () => {
+    expect(findLatestReviewComment(undefined)).toBeUndefined();
+  });
+
+  it('should return undefined for non-array input', () => {
+    expect(findLatestReviewComment('not an array')).toBeUndefined();
+  });
+
+  it('should return undefined for empty array', () => {
+    expect(findLatestReviewComment([])).toBeUndefined();
+  });
+
+  it('should return first non-copilot comment', () => {
+    const reviewComments = [
+      { id: 1, body: 'Please fix this', user: { login: 'reviewer' } },
+      { id: 2, body: 'Also fix this', user: { login: 'anotherreviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    expect(result.id).toBe(1);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should skip copilot[bot] comments', () => {
+    const reviewComments = [
+      { id: 1, body: 'AI comment', user: { login: 'copilot[bot]' } },
+      { id: 2, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    expect(result.id).toBe(2);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should return undefined if all comments are from copilot[bot]', () => {
+    const reviewComments = [
+      { id: 1, body: 'AI comment 1', user: { login: 'copilot[bot]' } },
+      { id: 2, body: 'AI comment 2', user: { login: 'copilot[bot]' } }
+    ];
+    expect(findLatestReviewComment(reviewComments)).toBeUndefined();
+  });
+
+  it('should skip comments with missing user field', () => {
+    const reviewComments = [
+      { id: 1, body: 'No user field' },
+      { id: 2, body: 'Please fix this', user: { login: 'reviewer' } }
+    ];
+    const result = findLatestReviewComment(reviewComments);
+    // The first comment has no user, so it should be skipped
+    expect(result.id).toBe(2);
+    expect(result.user.login).toBe('reviewer');
+  });
+
+  it('should return undefined if all comments have missing user fields', () => {
+    const reviewComments = [
+      { id: 1, body: 'No user field' },
+      { id: 2, body: 'Also no user field' }
+    ];
+    expect(findLatestReviewComment(reviewComments)).toBeUndefined();
+  });
+});
+
+describe('findRelevantComment with feedback comments', () => {
+  it('should filter out feedback implementation comments', () => {
+    const comments = [
+      { body: '@copilot please implement the feedback left on this PR.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out both bump and feedback comments', () => {
+    const comments = [
+      { body: '@copilot still working?' },
+      { body: '@copilot please implement the feedback left on this PR.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out merge conflict comments', () => {
+    const comments = [
+      { body: '@copilot There is a merge conflict with the base branch. Please merge in the base branch and resolve the conflicts.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+});
+
+describe('hasMergeConflict', () => {
+  it('should return true when mergeable is false and mergeable_state is dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'dirty'
+    };
+    expect(hasMergeConflict(pr)).toBe(true);
+  });
+
+  it('should return false when mergeable is true', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'clean'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is null (GitHub still computing)', () => {
+    const pr = {
+      mergeable: null,
+      mergeable_state: 'unknown'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable is false but state is not dirty', () => {
+    const pr = {
+      mergeable: false,
+      mergeable_state: 'blocked'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+
+  it('should return false when mergeable state is unstable', () => {
+    const pr = {
+      mergeable: true,
+      mergeable_state: 'unstable'
+    };
+    expect(hasMergeConflict(pr)).toBe(false);
+  });
+});
+
+describe('hasCopilotSessionStopped', () => {
+  it('should return false for null input', () => {
+    expect(hasCopilotSessionStopped(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasCopilotSessionStopped(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasCopilotSessionStopped('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasCopilotSessionStopped([])).toBe(false);
+  });
+
+  it('should return true when timeline contains copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'commented' },
+      { event: 'copilot_session_stopped' },
+      { event: 'committed' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
+  });
+
+  it('should return false when timeline has no copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'commented' },
+      { event: 'committed' },
+      { event: 'labeled' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(false);
+  });
+
+  it('should return true for timeline with only copilot_session_stopped event', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
+  });
+
+  it('should return true when multiple copilot_session_stopped events exist', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped' },
+      { event: 'commented' },
+      { event: 'copilot_session_stopped' }
+    ];
+    expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
   });
 });
