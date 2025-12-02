@@ -83,18 +83,31 @@ You can also configure this when running locally by setting the `SKIP_NON_OWNED_
    - If the PR has merge conflicts with the base branch, it adds a comment asking Copilot to merge in the base branch and resolve the conflicts
    - If there are line-level review comments (feedback), it adds a comment with `@copilot please implement the feedback left on this PR.` to trigger Copilot to address the feedback
    - Otherwise, it adds a comment with `@copilot still working?` to trigger Copilot to continue working
+   - Hasn't been updated in the last hour
+   - OR has a Copilot error in comments (e.g., rate limits or other errors)
+   - OR has a failed Copilot session (based on PR timeline events)
+   - OR has failing CI check runs (e.g., test failures or build issues)
+5. If the conditions are met, it uses AI to analyze the latest comment to determine if the issue has been fixed
+6. If the issue doesn't appear to be fixed, it adds a comment based on priority:
+   - **Merge conflicts**: Asks Copilot to merge in the base branch and resolve the conflicts
+   - **Failing CI checks**: Asks Copilot to fix the failing tests or build issues
+   - **Line-level review comments**: Asks Copilot to implement the feedback left on the PR
+   - **Otherwise**: Asks Copilot "still working?" to trigger continuation
 7. Limits commenting to a maximum of 5 PRs per run to avoid hitting GitHub API rate limits
 8. **Second pass with relaxed criteria**: If fewer than 2 PRs were bumped in the first pass (with 1-hour stall threshold), the action performs a second pass with a relaxed 30-minute stall threshold to find additional PRs that might need bumping
 
 ## Customization
 
 You can modify `lib/bumper.js` to adjust:
+- The stall detection period (currently: 1 hour)
+- The comment used to trigger Copilot for different situations
 - The stall detection period (currently: 1 hour default, 30 minutes for second pass)
 - The minimum bumps threshold before triggering a second pass (currently: 2)
 - The comment used to trigger Copilot
 - The PR identification criteria
 - The AI model used for comment analysis (using GitHub's hosted models)
 - The prompt used for issue resolution detection
+- The detection patterns for Copilot errors
 
 ## License
 
