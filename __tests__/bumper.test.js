@@ -12,7 +12,9 @@ import {
   hasReviewComments,
   findLatestReviewComment,
   hasMergeConflict,
-  hasCopilotSessionStopped
+  hasCopilotSessionStopped,
+  hasFailedCopilotSession,
+  hasFailingCheckRuns
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -621,5 +623,142 @@ describe('hasCopilotSessionStopped', () => {
       { event: 'copilot_session_stopped' }
     ];
     expect(hasCopilotSessionStopped(timelineEvents)).toBe(true);
+  });
+});
+
+describe('hasFailedCopilotSession', () => {
+  it('should return false for null input', () => {
+    expect(hasFailedCopilotSession(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasFailedCopilotSession(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasFailedCopilotSession('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasFailedCopilotSession([])).toBe(false);
+  });
+
+  it('should return true when copilot_session_stopped event with failure outcome exists', () => {
+    const timelineEvents = [
+      { event: 'commented', actor: { login: 'user1' } },
+      { event: 'copilot_session_stopped', copilot_session: { outcome: 'failure' } },
+      { event: 'committed', actor: { login: 'copilot[bot]' } }
+    ];
+    expect(hasFailedCopilotSession(timelineEvents)).toBe(true);
+  });
+
+  it('should return false when copilot_session_stopped event has success outcome', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped', copilot_session: { outcome: 'success' } }
+    ];
+    expect(hasFailedCopilotSession(timelineEvents)).toBe(false);
+  });
+
+  it('should return false when no copilot_session_stopped event exists', () => {
+    const timelineEvents = [
+      { event: 'commented', actor: { login: 'user1' } },
+      { event: 'committed', actor: { login: 'copilot[bot]' } }
+    ];
+    expect(hasFailedCopilotSession(timelineEvents)).toBe(false);
+  });
+
+  it('should return false when copilot_session field is missing', () => {
+    const timelineEvents = [
+      { event: 'copilot_session_stopped' }
+    ];
+    expect(hasFailedCopilotSession(timelineEvents)).toBe(false);
+  });
+});
+
+describe('hasFailingCheckRuns', () => {
+  it('should return false for null input', () => {
+    expect(hasFailingCheckRuns(null)).toBe(false);
+  });
+
+  it('should return false for undefined input', () => {
+    expect(hasFailingCheckRuns(undefined)).toBe(false);
+  });
+
+  it('should return false for non-array input', () => {
+    expect(hasFailingCheckRuns('not an array')).toBe(false);
+  });
+
+  it('should return false for empty array', () => {
+    expect(hasFailingCheckRuns([])).toBe(false);
+  });
+
+  it('should return true when check run has failure conclusion', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: 'success' },
+      { name: 'build', conclusion: 'failure' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(true);
+  });
+
+  it('should return true when check run has action_required conclusion', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: 'success' },
+      { name: 'security', conclusion: 'action_required' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(true);
+  });
+
+  it('should return true when check run has timed_out conclusion', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: 'timed_out' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(true);
+  });
+
+  it('should return false when all check runs have success conclusion', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: 'success' },
+      { name: 'build', conclusion: 'success' },
+      { name: 'lint', conclusion: 'success' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(false);
+  });
+
+  it('should return false when check runs have neutral or skipped conclusion', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: 'neutral' },
+      { name: 'build', conclusion: 'skipped' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(false);
+  });
+
+  it('should return false when check runs are still in progress (null conclusion)', () => {
+    const checkRuns = [
+      { name: 'test', conclusion: null, status: 'in_progress' }
+    ];
+    expect(hasFailingCheckRuns(checkRuns)).toBe(false);
+  });
+});
+
+describe('findRelevantComment with CI comments', () => {
+  it('should filter out CI failure comments', () => {
+    const comments = [
+      { body: '@copilot The CI checks are failing. Please fix the failing tests or build issues.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
+  });
+
+  it('should filter out all bump comments including CI failure', () => {
+    const comments = [
+      { body: '@copilot still working?' },
+      { body: '@copilot please implement the feedback left on this PR.' },
+      { body: '@copilot There is a merge conflict with the base branch. Please merge in the base branch and resolve the conflicts.' },
+      { body: '@copilot The CI checks are failing. Please fix the failing tests or build issues.' },
+      { body: 'This is the real comment' }
+    ];
+    const result = findRelevantComment(comments);
+    expect(result.body).toBe('This is the real comment');
   });
 });
