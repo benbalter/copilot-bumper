@@ -12,7 +12,6 @@ import {
   hasReviewComments,
   findLatestReviewComment,
   hasMergeConflict,
-  hasCopilotSessionStopped
   hasCopilotSessionStopped,
   hasFailedCopilotSession,
   hasFailingCheckRuns
