@@ -15,7 +15,6 @@ import {
   hasCopilotSessionStopped,
   hasFailedCopilotSession,
   hasFailingCheckRuns
-  hasCopilotSessionStopped
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
