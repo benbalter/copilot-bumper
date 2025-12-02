@@ -15,6 +15,7 @@ import {
   hasCopilotSessionStopped,
   hasFailedCopilotSession,
   hasFailingCheckRuns
+  hasCopilotSessionStopped
 } from '../lib/bumper.js';
 
 describe('isCopilotPr', () => {
@@ -121,6 +122,39 @@ describe('isStalled', () => {
       updated_at: fiveMinutesAgo.toISOString()
     };
     expect(isStalled(pr)).toBe(false);
+  });
+
+  it('should use custom threshold when provided', () => {
+    const fortyMinutesAgo = new Date(Date.now() - 40 * 60 * 1000);
+    const pr = {
+      updated_at: fortyMinutesAgo.toISOString()
+    };
+    // With default 1 hour threshold, this should not be stalled
+    expect(isStalled(pr)).toBe(false);
+    // With 30 minute threshold, this should be stalled
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(true);
+  });
+
+  it('should return false when time is exactly at threshold', () => {
+    // Test boundary: exactly at 30 minutes
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const pr = {
+      updated_at: thirtyMinutesAgo.toISOString()
+    };
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    // Should be false because it's NOT greater than threshold
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(false);
+  });
+
+  it('should return true when time is just over threshold', () => {
+    // Just over 30 minutes (30 minutes + 1 second)
+    const justOverThirtyMinutes = new Date(Date.now() - (30 * 60 * 1000 + 1000));
+    const pr = {
+      updated_at: justOverThirtyMinutes.toISOString()
+    };
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    expect(isStalled(pr, thirtyMinutesMs)).toBe(true);
   });
 });
 
