@@ -206,9 +206,9 @@ describe('findRelevantComment', () => {
 describe('filterPrNotifications', () => {
   it('should filter for PullRequest type', () => {
     const notifications = [
-      { subject: { type: 'PullRequest' } },
-      { subject: { type: 'Issue' } },
-      { subject: { type: 'PullRequest' } }
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'user1' } } },
+      { subject: { type: 'Issue' }, repository: { owner: { login: 'user1' } } },
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'user1' } } }
     ];
     const result = filterPrNotifications(notifications);
     expect(result).toHaveLength(2);
@@ -217,8 +217,8 @@ describe('filterPrNotifications', () => {
 
   it('should return empty array if no PR notifications', () => {
     const notifications = [
-      { subject: { type: 'Issue' } },
-      { subject: { type: 'Commit' } }
+      { subject: { type: 'Issue' }, repository: { owner: { login: 'user1' } } },
+      { subject: { type: 'Commit' }, repository: { owner: { login: 'user1' } } }
     ];
     const result = filterPrNotifications(notifications);
     expect(result).toHaveLength(0);
@@ -227,6 +227,32 @@ describe('filterPrNotifications', () => {
   it('should handle empty array', () => {
     const result = filterPrNotifications([]);
     expect(result).toHaveLength(0);
+  });
+
+  it('should filter by ownership when skipNonOwnedRepos is true', () => {
+    const notifications = [
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'owner1' } } },
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'owner2' } } },
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'owner1' } } }
+    ];
+    const result = filterPrNotifications(notifications, {
+      skipNonOwnedRepos: true,
+      authenticatedUserLogin: 'owner1'
+    });
+    expect(result).toHaveLength(2);
+    expect(result.every(n => n.repository.owner.login === 'owner1')).toBe(true);
+  });
+
+  it('should not filter by ownership when skipNonOwnedRepos is false', () => {
+    const notifications = [
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'owner1' } } },
+      { subject: { type: 'PullRequest' }, repository: { owner: { login: 'owner2' } } }
+    ];
+    const result = filterPrNotifications(notifications, {
+      skipNonOwnedRepos: false,
+      authenticatedUserLogin: 'owner1'
+    });
+    expect(result).toHaveLength(2);
   });
 });
 
